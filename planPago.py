@@ -1,11 +1,5 @@
 """
-╔══════════════════════════════════════════════════════════════╗
-║          PLAN DE PAGOS - CAJA LOS ANDES                     ║
-║          Cuotas Constantes (Sistema Francés)                 ║
-╚══════════════════════════════════════════════════════════════╝
-
-Autor  : Adaptado del sistema original
-Lógica : Equivalent al método CalculaPpgCuotasConstantes2
+plan pagos cracla
 """
 
 from datetime import date, timedelta
@@ -396,8 +390,8 @@ if __name__ == "__main__":
     print("\n>>> EJEMPLO 1 — FECHA FIJA\n")
 
     params_fecha_fija = ParametrosPlanPago(
-        monto_desembolso   = 5000.00,
-        tasa_interes_anual = 56.99 / 100.0,   # 56.99% TEA
+        monto_desembolso   = 20000.00,
+        tasa_interes_anual = 41.99 / 100.0,   # 56.99% TEA
         fecha_desembolso   = date(2026, 1, 29),
         num_cuotas         = 10,
         dias_gracia        = 0,
