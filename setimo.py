@@ -143,9 +143,8 @@ def calcular_prima_seguro(
         return _r2(sal_cap * seguro.n_valor * factor)
 
     elif seguro.id_tipo_valor == 2:
-        # Prima fija proporcional a días del período
-        factor = _d(dias) / _d(30)
-        return _r2(seguro.n_valor * factor)
+        # Prima FIJA: mismo monto en todas las cuotas, sin proporcional a días
+        return _r2(seguro.n_valor)
 
     return Decimal("0.00")
 
@@ -577,17 +576,17 @@ if __name__ == "__main__":
     print("    NOTA: El banco muestra Seg.Desgrav cuota 1 = 0.05 (error de impresión).")
     print("    El valor correcto calculado es 1.70 → cuadra con fórmula Saldo×Tasa×(días/30)\n")
     p1 = ParametrosPlanPago(
-        monto_desembolso        = 3100.00,
-        tasa_interes_anual      = 73.00 / 100.0,
+        monto_desembolso        = 3000.00,
+        tasa_interes_anual      = 75.99 / 100.0,
         fecha_desembolso        = date(2026, 1, 29),
         num_cuotas              = 12,
         dias_gracia             = 0,
         tipo_periodo            = 1,           # Fecha Fija
-        dia_fec_pago            = 23,
-        fecha_primera_cuota     = date(2026, 2, 23),
+        dia_fec_pago            = 24,
+        fecha_primera_cuota     = date(2026, 2, 24),
         id_seguro_desgravamen   = 9,           # DESGRAVAMEN INDIVIDUAL (0.001650)
         id_plan_seguro          = None,
-        max_dias_primera_cuota  = 25,
+        max_dias_primera_cuota  = 26,
         n_dec_redon_calc_ppg    = 1,
     )
     imprimir_plan_pagos(generar_plan_pagos(p1), p1)

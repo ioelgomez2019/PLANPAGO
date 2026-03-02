@@ -60,9 +60,9 @@ class TipoSeguro:
     """
     Registro de la tabla TipoSeguro de la BD.
 
-    idTipoValor=1 → nValor es la TASA directa para desgravamen
-                    seg_desgravamen = sal_cap × nValor × (dias / 30)
-                    Ejemplo: nValor=0.001650 → tasa proporcional a días
+    idTipoValor=1 → nValor es la PRIMA PORCENTUAL (%) para desgravamen
+                    seg_desgravamen = (nValor × sal_cap) / 100
+                    Ejemplo: nValor=0.165 → prima=0.165% del saldo capital
 
     idTipoValor=2 → nValor es prima fija mensual en soles
                     prima = nValor × (dias/30)
@@ -77,17 +77,17 @@ class TipoSeguro:
 # NOTA: nValor para desgravamen (idTipoValor=1) representa la prima en %
 #       Ej: 0.165 → 0.165% del saldo capital
 TABLA_SEGUROS: dict[int, TipoSeguro] = {
-    1:  TipoSeguro(1,  "SEGURO MULTIRIESGO",                              _d("0.001150"), 1),
+    1:  TipoSeguro(1,  "SEGURO MULTIRIESGO",                              _d("0.115000"), 1),
     2:  TipoSeguro(2,  "SEGURO VIDA",                                     _d("5.000000"), 2),
     4:  TipoSeguro(4,  "SEGURO ONCOLÓGICO",                               _d("5.000000"), 2),
     5:  TipoSeguro(5,  "PLAN 1: A. EDUCATIVA",                            _d("2.500000"), 2),
     6:  TipoSeguro(6,  "PLAN 2: A. EDUCATIVA + A. SALUD",                 _d("5.750000"), 2),
     7:  TipoSeguro(7,  "PLAN 3: A. EDUCATIVA + A. SALUD + S. INCAPACIDAD",_d("8.500000"), 2),
     8:  TipoSeguro(8,  "SIN SEGURO DESGRAVAMEN",                          _d("0.000000"), 1),
-    9:  TipoSeguro(9,  "SEGURO DESGRAVAMEN INDIVIDUAL",                   _d("0.001650"), 1),
-    10: TipoSeguro(10, "SEGURO DESGRAVAMEN CONYUGAL",                     _d("0.002050"), 1),
-    11: TipoSeguro(11, "SEGURO DESGRAVAMEN INDIVIDUAL ESPECIAL",          _d("0.001450"), 1),
-    12: TipoSeguro(12, "SEGURO DESGRAVAMEN DEVOLUCIÓN",                   _d("0.002340"), 1),
+    9:  TipoSeguro(9,  "SEGURO DESGRAVAMEN INDIVIDUAL",                   _d("0.165000"), 1),
+    10: TipoSeguro(10, "SEGURO DESGRAVAMEN CONYUGAL",                     _d("0.205000"), 1),
+    11: TipoSeguro(11, "SEGURO DESGRAVAMEN INDIVIDUAL ESPECIAL",          _d("0.145000"), 1),
+    12: TipoSeguro(12, "SEGURO DESGRAVAMEN DEVOLUCIÓN",                   _d("0.234000"), 1),
 }
 
 
@@ -123,13 +123,13 @@ def calcular_prima_seguro(
     Calcula la prima del seguro para una cuota.
 
     ╔══════════════════════════════════════════════════════════════╗
-    ║  idTipoValor=1 → SEGURO DESGRAVAMEN (tasa proporcional)      ║
+    ║  idTipoValor=1 → SEGURO DESGRAVAMEN (porcentaje sobre saldo) ║
     ║                                                              ║
-    ║      seg_desgravamen = sal_cap × nValor × (dias / 30)       ║
+    ║      seg_desgravamen = (Prima × Saldo_Capital) / 100        ║
     ║                                                              ║
-    ║  Ejemplo con DESGRAVAMEN INDIVIDUAL (nValor=0.001650):       ║
-    ║      saldo=1,000 | días=31                                   ║
-    ║      seg = 1000 × 0.001650 × (31/30) = 1.705 → S/ 1.70     ║
+    ║  Ejemplo con DESGRAVAMEN INDIVIDUAL (prima=0.165%):          ║
+    ║      saldo = S/ 3,000.00                                     ║
+    ║      seg   = (0.165 × 3000) / 100 = S/ 4.95                 ║
     ╠══════════════════════════════════════════════════════════════╣
     ║  idTipoValor=2 → PRIMA FIJA (monto fijo proporcional a días) ║
     ║                                                              ║
@@ -138,9 +138,8 @@ def calcular_prima_seguro(
     ╚══════════════════════════════════════════════════════════════╝
     """
     if seguro.id_tipo_valor == 1:
-        # ✅ FÓRMULA CORRECTA: Saldo × Tasa × (Días / 30)
-        factor = _d(dias) / _d(30)
-        return _r2(sal_cap * seguro.n_valor * factor)
+        # ✅ FÓRMULA CORREGIDA: (Prima × Saldo Capital) / 100
+        return _r2((seguro.n_valor * sal_cap) / _d(100))
 
     elif seguro.id_tipo_valor == 2:
         # Prima fija proporcional a días del período
@@ -568,14 +567,14 @@ if __name__ == "__main__":
 
     print("\n" + "═"*80)
     print("  SEGUROS DISPONIBLES")
-    print("  Fórmula desgravamen: Saldo × Tasa × (Días / 30)")
+    print("  Fórmula desgravamen: (Prima% × Saldo Capital) / 100")
     print("═"*80)
     listar_seguros()
 
-    # ── DEMO 1: Réplica exacta del documento Bco. La Nación ──────────
-    print("\n>>> DEMO 1 — Réplica Bco. La Nación: S/1,000 | TEA 41.99% | 12 cuotas\n")
-    print("    NOTA: El banco muestra Seg.Desgrav cuota 1 = 0.05 (error de impresión).")
-    print("    El valor correcto calculado es 1.70 → cuadra con fórmula Saldo×Tasa×(días/30)\n")
+    # ── DEMO 1 ──────────────────────────────────────────────────────
+    print("\n>>> DEMO 1 — S/3,000 | TEA 80.90% | 12 cuotas | Desembolso 22/08/2024\n")
+    print("    Verificación cuota 1:")
+    print("    seg_desgravamen = (0.165 × 3,000.00) / 100 = S/ 4.95\n")
     p1 = ParametrosPlanPago(
         monto_desembolso        = 3100.00,
         tasa_interes_anual      = 73.00 / 100.0,
@@ -592,27 +591,9 @@ if __name__ == "__main__":
     )
     imprimir_plan_pagos(generar_plan_pagos(p1), p1)
 
-    # # ── DEMO 2: S/3,000 | TEA 80.90% ────────────────────────────────
-    # print("\n>>> DEMO 2 — S/3,000 | TEA 80.90% | 12 cuotas | Desembolso 22/08/2024\n")
+    # # ── DEMO 2: Con PLAN 1 ───────────────────────────────────────────
+    # print("\n>>> DEMO 2 — S/10,000 | TEA 49.99% | 12 cuotas | PLAN 1 Educativa\n")
     # p2 = ParametrosPlanPago(
-    #     monto_desembolso        = 3000.00,
-    #     tasa_interes_anual      = 80.90 / 100.0,
-    #     fecha_desembolso        = date(2024, 8, 22),
-    #     num_cuotas              = 12,
-    #     dias_gracia             = 0,
-    #     tipo_periodo            = 1,
-    #     dia_fec_pago            = 22,
-    #     fecha_primera_cuota     = date(2024, 9, 22),
-    #     id_seguro_desgravamen   = 9,
-    #     id_plan_seguro          = None,
-    #     max_dias_primera_cuota  = 31,
-    #     n_dec_redon_calc_ppg    = 1,
-    # )
-    # imprimir_plan_pagos(generar_plan_pagos(p2), p2)
-
-    # # ── DEMO 3: Con PLAN 1 ───────────────────────────────────────────
-    # print("\n>>> DEMO 3 — S/10,000 | TEA 49.99% | 12 cuotas | PLAN 1 Educativa\n")
-    # p3 = ParametrosPlanPago(
     #     monto_desembolso        = 10000.00,
     #     tasa_interes_anual      = 49.99 / 100.0,
     #     fecha_desembolso        = date(2026, 1, 29),
@@ -621,8 +602,28 @@ if __name__ == "__main__":
     #     tipo_periodo            = 1,
     #     dia_fec_pago            = 26,
     #     fecha_primera_cuota     = date(2026, 2, 26),
-    #     id_seguro_desgravamen   = 9,
+    #     id_seguro_desgravamen   = 9,           # DESGRAVAMEN INDIVIDUAL (0.165%)
     #     id_plan_seguro          = 5,           # PLAN 1: A. EDUCATIVA (+S/2.50/mes)
+    #     max_dias_primera_cuota  = 30,
+    #     n_dec_redon_calc_ppg    = 1,
+    # )
+    # imprimir_plan_pagos(generar_plan_pagos(p2), p2)
+
+    # # ── DEMO 3: Desgravamen conyugal ─────────────────────────────────
+    # print("\n>>> DEMO 3 — S/5,000 | TEA 35.00% | 24 cuotas | Desgravamen CONYUGAL\n")
+    # print("    Verificación cuota 1:")
+    # print("    seg_desgravamen = (0.205 × 5,000.00) / 100 = S/ 10.25\n")
+    # p3 = ParametrosPlanPago(
+    #     monto_desembolso        = 5000.00,
+    #     tasa_interes_anual      = 35.00 / 100.0,
+    #     fecha_desembolso        = date(2026, 1, 15),
+    #     num_cuotas              = 24,
+    #     dias_gracia             = 0,
+    #     tipo_periodo            = 1,
+    #     dia_fec_pago            = 15,
+    #     fecha_primera_cuota     = date(2026, 2, 15),
+    #     id_seguro_desgravamen   = 10,          # DESGRAVAMEN CONYUGAL (0.205%)
+    #     id_plan_seguro          = None,
     #     max_dias_primera_cuota  = 30,
     #     n_dec_redon_calc_ppg    = 1,
     # )
