@@ -4,7 +4,6 @@ from datetime import date, timedelta
 from dataclasses import dataclass
 from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP, getcontext
-from decimal import ROUND_HALF_EVEN  # ← agregar este import
 
 getcontext().prec = 28
 
@@ -119,11 +118,10 @@ def listar_seguros():
 
 
 def calcular_prima_seguro(seguro: TipoSeguro, sal_cap: Decimal, dias: int) -> Decimal:
-    if seguro.id_tipo_valor == 1:
-        val = sal_cap * seguro.n_valor / _d(30) * _d(dias)
-        # El corebank usa ROUND_HALF_EVEN (banker's rounding) para el desgravamen
-        return val.quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
-    elif seguro.id_tipo_valor == 2:
+    if seguro.id_tipo_valor == 1: #fecha fija
+        factor = _d(dias) / _d(30)
+        return _r2(sal_cap * seguro.n_valor * factor)
+    elif seguro.id_tipo_valor == 2: #periodo fijo
         return _r2(seguro.n_valor)
     return Decimal("0.00")
 
@@ -229,7 +227,6 @@ def calcular_dias_gracia_extra(
     max_dias: int = 30
 ) -> int:
     dias = (fecha_primera_cuota - fecha_desembolso).days
-        #40 <= 30
     if dias <= max_dias:
         return 0
     gracia = 0
@@ -255,7 +252,7 @@ def _cronograma_fecha_fija(params: ParametrosPlanPago, gracia_extra: int):
         if i == 1:
             fecha_cuota = params.fecha_primera_cuota
             dias = (fecha_cuota - params.fecha_desembolso).days
-            dias_acu += dias          # ← SIN sumar gracia_extra aquí
+            dias_acu += dias + gracia_extra
         else:
             fa = fechas[-1][0]
             nm = fa.month + 1
@@ -342,12 +339,11 @@ def generar_plan_pagos(params: ParametrosPlanPago) -> list[CuotaPlan]:
     # ── Cronograma de fechas ──────────────────────────────────────────
     if params.tipo_periodo == 1:
         # Fecha Fija: gracia_extra aplica cuando 1ra cuota supera max_dias
-        # gracia_extra = calcular_dias_gracia_extra(
-        #     params.fecha_desembolso,
-        #     params.fecha_primera_cuota,
-        #     params.max_dias_primera_cuota
-        # )
-        gracia_extra = params.dias_gracia
+        gracia_extra = calcular_dias_gracia_extra(
+            params.fecha_desembolso,
+            params.fecha_primera_cuota,
+            params.max_dias_primera_cuota
+        )
         if gracia_extra > 0:
             print(f"  [GRACIA] 1ra cuota supera {params.max_dias_primera_cuota} días → "
                   f"{gracia_extra} día(s) de gracia extra.\n")
@@ -396,26 +392,15 @@ def generar_plan_pagos(params: ParametrosPlanPago) -> list[CuotaPlan]:
             interes = _r2(saldo * ((Decimal(1) + TED) ** dias - Decimal(1)))
             seg_desgrav = calcular_prima_seguro(seg_desgrav_obj, saldo, dias)
 
-            if plan_obj is not None:
-                # base mensual (30 días)
-                prima_plan = _r2(plan_obj.n_valor)
+            prima_plan = (
+                calcular_prima_seguro(plan_obj, saldo, dias)
+                if plan_obj is not None else Decimal("0.00")
+            )
 
-                # 🔥 lógica del core
-                if num_cuota == 1:
-                    if params.tipo_periodo == 1:
-                        dias_extra = params.dias_gracia
-                    else:
-                        dias_extra = dias - 30
-
-                    if dias_extra > 0:
-                        prima_plan += _r2(plan_obj.n_valor / _d(30) * _d(dias_extra))
-            else:
-                prima_plan = Decimal("0.00")
-
-            # if num_cuota == 1 and plan_obj is not None:
-            #     dias_gracia_prima = dias - 30
-            #     if dias_gracia_prima > 0:
-            #         prima_plan += _r2(plan_obj.n_valor / _d(30) * _d(dias_gracia_prima))
+            if num_cuota == 1 and plan_obj is not None:
+                dias_gracia_prima = dias - 30
+                if dias_gracia_prima > 0:
+                    prima_plan += _r2(plan_obj.n_valor / _d(30) * _d(dias_gracia_prima))
 
             seg_comi = _r2(seg_desgrav + prima_plan)
 
@@ -733,36 +718,20 @@ if __name__ == "__main__":
 
     # ── CASO 1: Fecha Fija (igual al original) ────────────────────────
 
-    # jsonPlanPago = planpagogenerado(
-    #     monto_desembolso        = 6500.00,
-    #     tasa_interes_anual      = 80.9100,
-    #     fecha_desembolso        = "27/03/2026",
-    #     num_cuotas              = 1,
-    #     tipo_periodo            = "Periodo Fijo",
-    #     dia_fec_pago            = 40,
-    #     fecha_primera_cuota     = "06/05/2026",
-    #     cseguro_desgravamen     = "SEGURO DESGRAVAMEN INDIVIDUAL",
-    #     cplan_seguro            = "PLAN 1: A. EDUCATIVA",
-    #     max_dias_primera_cuota  = 40,
-    # )
-
     jsonPlanPago = planpagogenerado(
-        monto_desembolso        = 6500.00,
-        tasa_interes_anual      = 75.9100,
+        monto_desembolso        = 3000.00,
+        tasa_interes_anual      = 53.00,
         fecha_desembolso        = "27/03/2026",
-        num_cuotas              = 1,
-        tipo_periodo            = "Periodo Fijo",
-        dias_gracia             = 0,
-        dia_fec_pago            = 40,
-        fecha_primera_cuota     = "06/05/2026",
+        num_cuotas              = 12,
+        tipo_periodo            = "Fecha Fija",
+        dias_gracia             = 10,
+        dia_fec_pago            = 7,
+        fecha_primera_cuota     = "07/05/2026",
         cseguro_desgravamen     = "SEGURO DESGRAVAMEN INDIVIDUAL",
-        cplan_seguro            = "PLAN 1: A. EDUCATIVA",
-        max_dias_primera_cuota  = 40,
+        cplan_seguro            = "NINGUNO",
+        max_dias_primera_cuota  = 41,
     )
 
     print()
     print("  JSON CRUDO:")
     #print(json.dumps(jsonPlanPago, indent=2, ensure_ascii=False))
-
-
-    
